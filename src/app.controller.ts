@@ -10,4 +10,11 @@ export class AppController {
       join(__dirname, '..', 'frontend', 'public', 'index.html'),
     );
   }
+
+  @Get('config')
+  getConfig() {
+    return {
+      socketUrl: process.env.PUBLIC_URL || 'http://localhost:3000',
+    };
+  }
 }

@@ -1,7 +1,7 @@
 import * as mediasoupClient from 'mediasoup-client';
 
-// Connect to the same host and port as the current page
-const socket = io(window.location.origin);
+// Socket will be initialized after fetching config
+let socket;
 
 // Helper function to promisify socket.emit with acknowledgment
 function socketRequest(event, data = {}) {
@@ -117,7 +117,56 @@ cameraSelect.onchange = () => {
   console.log('📹 Camera changed to:', cameraSelect.options[cameraSelect.selectedIndex].text);
 };
 
-// Load devices on page load
+// Initialize socket connection with config from server
+async function initializeSocket() {
+  try {
+    const response = await fetch('/config');
+    const config = await response.json();
+    console.log('🔧 Server config:', config);
+    
+    // Initialize socket with the PUBLIC_URL from server
+    socket = io(config.socketUrl);
+    
+    // Setup socket event handlers
+    setupSocketHandlers();
+    
+    console.log('✅ Socket initialized with URL:', config.socketUrl);
+  } catch (error) {
+    console.error('❌ Failed to fetch config, using current origin:', error);
+    // Fallback to current origin if config fetch fails
+    socket = io(window.location.origin);
+    setupSocketHandlers();
+  }
+}
+
+function setupSocketHandlers() {
+  socket.on('connect', () => {
+    console.log('✅ Connected to server:', socket.id);
+    myClientId = socket.id;
+  });
+
+  socket.on('newProducer', async ({ producerId, clientId, kind }) => {
+    console.log('📢 NEW PRODUCER EVENT:', { producerId, clientId, kind });
+    if (kind === 'audio') {
+      await consumeAudio(producerId, clientId);
+    } else if (kind === 'video') {
+      await consumeVideo(producerId, clientId);
+    }
+  });
+
+  socket.on('userJoined', ({ clientId }) => {
+    console.log('👤 User joined:', clientId);
+    addParticipant(clientId);
+  });
+
+  socket.on('userLeft', ({ clientId }) => {
+    console.log('👋 User left:', clientId);
+    removeParticipant(clientId);
+  });
+}
+
+// Initialize socket and load devices on page load
+initializeSocket();
 loadDevices();
 
 // Global audio enabler - ensures all audio elements can play
@@ -143,33 +192,7 @@ document.addEventListener(
 );
 
 // Socket Events
-socket.on('connect', () => {
-  myClientId = socket.id;
-  console.log('✅ Connected to server:', myClientId);
-});
-
-socket.on('newProducer', async ({ producerId, clientId, kind }) => {
-  console.log('📢 NEW PRODUCER EVENT:', { producerId, clientId, kind });
-  if (kind === 'audio') {
-    await consumeAudio(producerId, clientId);
-  } else if (kind === 'video') {
-    await consumeVideo(producerId, clientId);
-  }
-});
-
-socket.on('userJoined', ({ clientId }) => {
-  console.log('👤 User joined:', clientId);
-  addParticipant(clientId);
-});
-
-socket.on('userLeft', ({ clientId }) => {
-  console.log('👋 User left:', clientId);
-  removeParticipant(clientId);
-});
-
-socket.on('disconnect', () => {
-  console.log('❌ Disconnected from server');
-});
+// Socket event handlers are now set up in setupSocketHandlers() after initialization
 
 // Main Functions
 async function joinChannel() {
