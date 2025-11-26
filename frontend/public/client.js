@@ -1,6 +1,7 @@
 import * as mediasoupClient from 'mediasoup-client';
 
-const socket = io('http://localhost:3000');
+// Connect to the same host and port as the current page
+const socket = io(window.location.origin);
 
 // Helper function to promisify socket.emit with acknowledgment
 function socketRequest(event, data = {}) {

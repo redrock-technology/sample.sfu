@@ -12,7 +12,10 @@ async function bootstrap() {
   // Serve static files from frontend/public
   app.useStaticAssets(join(__dirname, '..', 'frontend', 'public'));
   
-  await app.listen(process.env.PORT ?? 3000);
-  console.log(`Server running on http://localhost:${process.env.PORT ?? 3000}`);
+  const port = process.env.PORT || 3000;
+  const host = process.env.HOST || 'localhost';
+  
+  await app.listen(port);
+  console.log(`Server running on http://${host}:${port}`);
 }
 bootstrap();

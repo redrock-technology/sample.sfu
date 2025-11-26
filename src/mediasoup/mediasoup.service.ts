@@ -13,8 +13,8 @@ export class MediasoupService implements OnModuleInit {
 
   async onModuleInit() {
     this.worker = await createWorker({
-      rtcMinPort: 40000,
-      rtcMaxPort: 49999,
+      rtcMinPort: parseInt(process.env.RTC_MIN_PORT) || 40000,
+      rtcMaxPort: parseInt(process.env.RTC_MAX_PORT) || 49999,
     });
 
     this.router = await this.worker.createRouter({
@@ -70,8 +70,10 @@ export class MediasoupService implements OnModuleInit {
   }
 
   async createWebRtcTransport(clientId: string) {
+    const announcedIp = process.env.ANNOUNCED_IP || '127.0.0.1';
+    
     const transport = await this.router.createWebRtcTransport({
-      listenIps: [{ ip: '0.0.0.0', announcedIp: '127.0.0.1' }], // Use localhost for local testing
+      listenIps: [{ ip: '0.0.0.0', announcedIp }],
       enableUdp: true,
       enableTcp: true,
       preferUdp: true,
