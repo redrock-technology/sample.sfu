@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Microphone Test</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    #bars { height: 100px; background: #eee; margin: 20px 0; position: relative; }
+    #level { position: absolute; bottom: 0; left: 0; background: green; width: 100%; transition: height 0.1s; }
+    button { padding: 10px 20px; font-size: 16px; margin: 5px; }
+    #devices { margin: 20px 0; }
+    select { padding: 5px; font-size: 14px; width: 400px; }
+  </style>
+</head>
+<body>
+  <h1>Microphone Test</h1>
+  
+  <div id="devices">
+    <label>Select Microphone:</label><br>
+    <select id="deviceSelect"></select>
+  </div>
+  
+  <button id="testBtn">Start Microphone Test</button>
+  <button id="stopBtn" disabled>Stop Test</button>
+  
+  <div id="bars">
+    <div id="level"></div>
+  </div>
+  
+  <p id="status">Click "Start" to test your microphone</p>
+  <p id="level-text" style="font-size: 24px; font-weight: bold;"></p>
+  
+  <script>
+    let audioContext;
+    let analyser;
+    let stream;
+    let animationId;
+    
+    const testBtn = document.getElementById('testBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
+    const levelDiv = document.getElementById('level');
+    const levelText = document.getElementById('level-text');
+    const deviceSelect = document.getElementById('deviceSelect');
+    
+    // List audio input devices
+    async function listDevices() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioDevices = devices.filter(d => d.kind === 'audioinput');
+      
+      deviceSelect.innerHTML = '';
+      audioDevices.forEach(device => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Microphone ${deviceSelect.length + 1}`;
+        deviceSelect.appendChild(option);
+      });
+      
+      console.log('Available audio input devices:', audioDevices);
+    }
+    
+    listDevices();
+    
+    testBtn.onclick = async () => {
+      try {
+        status.textContent = 'Requesting microphone access...';
+        
+        const constraints = {
+          audio: {
+            deviceId: deviceSelect.value ? { exact: deviceSelect.value } : undefined,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          }
+        };
+        
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        status.textContent = `✅ Microphone active: ${stream.getAudioTracks()[0].label}`;
+        console.log('Stream:', stream);
+        console.log('Track:', stream.getAudioTracks()[0]);
+        
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        
+        const source = audioContext.createMediaStreamSource(stream);
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        function updateLevel() {
+          analyser.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+          const max = Math.max(...dataArray);
+          
+          levelDiv.style.height = (max / 255 * 100) + '%';
+          levelText.textContent = `Level: ${Math.round(average)} / Max: ${max}`;
+          
+          if (average > 5) {
+            levelDiv.style.background = 'green';
+            console.log('🎤 AUDIO DETECTED! avg:', Math.round(average), 'max:', max);
+          } else {
+            levelDiv.style.background = 'red';
+          }
+          
+          animationId = requestAnimationFrame(updateLevel);
+        }
+        
+        updateLevel();
+        
+        testBtn.disabled = true;
+        stopBtn.disabled = false;
+        
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        console.error('Microphone test failed:', e);
+      }
+    };
+    
+    stopBtn.onclick = () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+      
+      levelDiv.style.height = '0%';
+      levelText.textContent = '';
+      status.textContent = 'Test stopped';
+      testBtn.disabled = false;
+      stopBtn.disabled = true;
+    };
+  </script>
+</body>
+</html>
+

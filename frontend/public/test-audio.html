@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Audio Output Test</title>
+</head>
+<body>
+  <h1>Audio Output Test</h1>
+  <button id="testBtn">Test Audio Output (Play Beep)</button>
+  <p id="status"></p>
+  
+  <script>
+    document.getElementById('testBtn').onclick = async () => {
+      const status = document.getElementById('status');
+      
+      try {
+        status.textContent = 'Creating audio context...';
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        status.textContent = `AudioContext state: ${audioContext.state}`;
+        
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+          status.textContent = `AudioContext resumed. State: ${audioContext.state}`;
+        }
+        
+        // Create a 440Hz test tone (beep)
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(440, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        status.textContent = 'Playing 440Hz beep for 1 second...';
+        console.log('AudioContext:', audioContext);
+        console.log('Destination:', audioContext.destination);
+        
+        oscillator.start();
+        setTimeout(() => {
+          oscillator.stop();
+          status.textContent = 'Done! Did you hear the beep? If YES, audio works. If NO, check Mac sound settings.';
+        }, 1000);
+        
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        console.error('Audio test failed:', e);
+      }
+    };
+  </script>
+</body>
+</html>
+
