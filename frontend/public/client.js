@@ -18,79 +18,106 @@ function socketRequest(event, data = {}) {
 let device;
 let sendTransport;
 let recvTransport;
-let producer;
+let audioProducer;
+let videoProducer;
 let audioStream;
+let videoStream;
 let consumers = new Map(); // consumerId -> consumer
 let participants = new Map(); // clientId -> participant info
 let currentRoomId = null;
 let selectedMicrophoneId = null; // Selected microphone device ID
+let selectedCameraId = null; // Selected camera device ID
+let isVideoEnabled = true;
+let isAudioEnabled = true;
 let isMuted = false;
 let myClientId = null;
 
 // UI Elements
 const joinBtn = document.getElementById('joinBtn');
-const muteBtn = document.getElementById('muteBtn');
-const leaveBtn = document.getElementById('leaveBtn');
 const channelInput = document.getElementById('channelInput');
 const microphoneSelect = document.getElementById('microphoneSelect');
+const cameraSelect = document.getElementById('cameraSelect');
 const statusDiv = document.getElementById('status');
-const joinSection = document.getElementById('joinSection');
-const controlsSection = document.getElementById('controls');
-const participantList = document.getElementById('participantList');
+const joinContainer = document.getElementById('joinContainer');
+const videoContainer = document.getElementById('videoContainer');
+const videoGrid = document.getElementById('videoGrid');
+const toggleMicBtn = document.getElementById('toggleMicBtn');
+const toggleVideoBtn = document.getElementById('toggleVideoBtn');
+const leaveCallBtn = document.getElementById('leaveCallBtn');
 
 // Event Listeners
 joinBtn.onclick = joinChannel;
-muteBtn.onclick = toggleMute;
-leaveBtn.onclick = leaveChannel;
+toggleMicBtn.onclick = toggleMicrophone;
+toggleVideoBtn.onclick = toggleVideo;
+leaveCallBtn.onclick = leaveChannel;
 channelInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') joinChannel();
 });
 
-// Load available microphones on page load
-async function loadMicrophones() {
+// Load available microphones and cameras on page load
+async function loadDevices() {
   try {
     // Request permission first to get device labels
-    await navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      stream.getTracks().forEach(track => track.stop());
-    });
+    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    tempStream.getTracks().forEach(track => track.stop());
     
     const devices = await navigator.mediaDevices.enumerateDevices();
     const audioInputs = devices.filter(device => device.kind === 'audioinput');
+    const videoInputs = devices.filter(device => device.kind === 'videoinput');
     
     console.log('🎤 Available microphones:', audioInputs);
+    console.log('📹 Available cameras:', videoInputs);
     
+    // Load microphones
     microphoneSelect.innerHTML = '';
-    
     if (audioInputs.length === 0) {
       microphoneSelect.innerHTML = '<option value="">No microphones found</option>';
-      return;
+    } else {
+      audioInputs.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Microphone ${index + 1}`;
+        microphoneSelect.appendChild(option);
+      });
+      selectedMicrophoneId = audioInputs[0].deviceId;
+      console.log('✅ Default microphone:', audioInputs[0].label);
     }
     
-    audioInputs.forEach((device, index) => {
-      const option = document.createElement('option');
-      option.value = device.deviceId;
-      option.text = device.label || `Microphone ${index + 1}`;
-      microphoneSelect.appendChild(option);
-    });
+    // Load cameras
+    cameraSelect.innerHTML = '';
+    if (videoInputs.length === 0) {
+      cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+    } else {
+      videoInputs.forEach((device, index) => {
+        const option = document.createElement('option');
+        option.value = device.deviceId;
+        option.text = device.label || `Camera ${index + 1}`;
+        cameraSelect.appendChild(option);
+      });
+      selectedCameraId = videoInputs[0].deviceId;
+      console.log('✅ Default camera:', videoInputs[0].label);
+    }
     
-    // Set the first microphone as default
-    selectedMicrophoneId = audioInputs[0].deviceId;
-    
-    console.log('✅ Microphones loaded. Default:', audioInputs[0].label);
   } catch (error) {
-    console.error('❌ Failed to load microphones:', error);
+    console.error('❌ Failed to load devices:', error);
     microphoneSelect.innerHTML = '<option value="">Error loading microphones</option>';
+    cameraSelect.innerHTML = '<option value="">Error loading cameras</option>';
   }
 }
 
-// Update selected microphone when user changes selection
+// Update selected devices when user changes selection
 microphoneSelect.onchange = () => {
   selectedMicrophoneId = microphoneSelect.value;
   console.log('🎤 Microphone changed to:', microphoneSelect.options[microphoneSelect.selectedIndex].text);
 };
 
-// Load microphones on page load
-loadMicrophones();
+cameraSelect.onchange = () => {
+  selectedCameraId = cameraSelect.value;
+  console.log('📹 Camera changed to:', cameraSelect.options[cameraSelect.selectedIndex].text);
+};
+
+// Load devices on page load
+loadDevices();
 
 // Global audio enabler - ensures all audio elements can play
 let audioEnabled = false;
@@ -120,9 +147,13 @@ socket.on('connect', () => {
   console.log('✅ Connected to server:', myClientId);
 });
 
-socket.on('newProducer', async ({ producerId, clientId }) => {
-  console.log('📢 NEW PRODUCER EVENT:', { producerId, clientId });
-  await consumeAudio(producerId, clientId);
+socket.on('newProducer', async ({ producerId, clientId, kind }) => {
+  console.log('📢 NEW PRODUCER EVENT:', { producerId, clientId, kind });
+  if (kind === 'audio') {
+    await consumeAudio(producerId, clientId);
+  } else if (kind === 'video') {
+    await consumeVideo(producerId, clientId);
+  }
 });
 
 socket.on('userJoined', ({ clientId }) => {
@@ -172,10 +203,14 @@ async function joinChannel() {
     await createRecvTransport();
     console.log('✅ Receive transport created');
 
-    // Get microphone access and start producing
+    // Get microphone and camera access
     console.log('🎤 Publishing microphone...');
     await publishMic();
     console.log('✅ Microphone published');
+    
+    console.log('📹 Publishing camera...');
+    await publishCamera();
+    console.log('✅ Camera published');
 
     // Join room
     console.log('🚪 Joining room:', roomId);
@@ -183,7 +218,7 @@ async function joinChannel() {
     console.log('✅ Joined room. Existing producers:', existingProducers);
     currentRoomId = roomId;
 
-    // Add myself to participants
+    // Add myself to participants with my own video
     addParticipant(myClientId, true);
 
     // Consume existing producers
@@ -193,23 +228,28 @@ async function joinChannel() {
         existingProducers.length,
         'existing producer(s)...',
       );
-      for (const { producerId, clientId } of existingProducers) {
+      for (const { producerId, clientId, kind } of existingProducers) {
         console.log(
-          '  → Consuming producer:',
+          `  → Consuming ${kind} producer:`,
           producerId,
           'from client:',
           clientId,
         );
-        await consumeAudio(producerId, clientId);
+        if (kind === 'audio') {
+          await consumeAudio(producerId, clientId);
+        } else if (kind === 'video') {
+          await consumeVideo(producerId, clientId);
+        }
         addParticipant(clientId);
       }
     } else {
       console.log('ℹ️ No existing producers to consume');
     }
 
-    showStatus(`Connected to channel: ${roomId}`, 'connected');
-    joinSection.style.display = 'none';
-    controlsSection.classList.add('show');
+    // Switch to video conference view
+    joinContainer.style.display = 'none';
+    videoContainer.classList.add('active');
+    updateVideoGrid();
     console.log('✅ Connection complete!');
   } catch (error) {
     console.error('Failed to join channel:', error);
@@ -350,7 +390,7 @@ async function publishMic() {
       readyState: track.readyState,
     });
 
-    producer = await sendTransport.produce({ 
+    audioProducer = await sendTransport.produce({ 
       track,
       codecOptions: {
         opusStereo: true,
@@ -361,26 +401,26 @@ async function publishMic() {
         opusPtime: 20,
       }
     });
-    console.log('  ✅ Producer created:', producer.id);
-    console.log('  📤 Producer paused:', producer.paused);
-    console.log('  📤 Producer track:', producer.track);
+    console.log('  ✅ Audio Producer created:', audioProducer.id);
+    console.log('  📤 Producer paused:', audioProducer.paused);
+    console.log('  📤 Producer track:', audioProducer.track);
     console.log('  📤 Producer codec options: high quality Opus');
 
     // Make sure producer is not paused
-    if (producer.paused) {
+    if (audioProducer.paused) {
       console.log('  ⚠️ Producer is paused, resuming...');
-      await producer.resume();
+      await audioProducer.resume();
       console.log('  ✅ Producer resumed');
     } else {
       console.log('  ✅ Producer is already active (not paused)');
     }
 
-    producer.on('trackended', () => {
-      console.log('  ⚠️ Producer track ended');
+    audioProducer.on('trackended', () => {
+      console.log('  ⚠️ Audio producer track ended');
     });
 
-    producer.on('transportclose', () => {
-      console.log('  ⚠️ Producer transport closed');
+    audioProducer.on('transportclose', () => {
+      console.log('  ⚠️ Audio producer transport closed');
     });
 
     // Monitor outgoing audio levels
@@ -419,7 +459,7 @@ async function publishMic() {
     // Log producer and transport stats periodically
     setInterval(async () => {
       try {
-        const stats = await producer.getStats();
+        const stats = await audioProducer.getStats();
         let foundRTP = false;
         stats.forEach((report) => {
           if (report.type === 'outbound-rtp' && report.kind === 'audio') {
@@ -441,6 +481,61 @@ async function publishMic() {
     }, 5000);
   } catch (error) {
     console.error('  ❌ Failed to get microphone access:', error);
+    throw error;
+  }
+}
+
+async function publishCamera() {
+  try {
+    console.log('  📹 Requesting camera access...');
+    const videoConstraints = {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30 },
+    };
+    
+    // Use selected camera if one is chosen
+    if (selectedCameraId) {
+      videoConstraints.deviceId = { exact: selectedCameraId };
+      console.log('  📹 Using selected camera:', selectedCameraId);
+    }
+    
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: videoConstraints,
+    });
+    console.log('  ✅ Got camera stream');
+
+    const track = videoStream.getVideoTracks()[0];
+    console.log('  📹 Video track:', {
+      id: track.id,
+      enabled: track.enabled,
+      readyState: track.readyState,
+      label: track.label,
+    });
+
+    videoProducer = await sendTransport.produce({ 
+      track,
+      encodings: [
+        { maxBitrate: 100000 },
+        { maxBitrate: 300000 },
+        { maxBitrate: 900000 },
+      ],
+      codecOptions: {
+        videoGoogleStartBitrate: 1000,
+      }
+    });
+    console.log('  ✅ Video producer created:', videoProducer.id);
+
+    videoProducer.on('trackended', () => {
+      console.log('  ⚠️ Video producer track ended');
+    });
+
+    videoProducer.on('transportclose', () => {
+      console.log('  ⚠️ Video producer transport closed');
+    });
+
+  } catch (error) {
+    console.error('  ❌ Failed to get camera access:', error);
     throw error;
   }
 }
@@ -827,41 +922,34 @@ async function consumeAudio(producerId, clientId) {
 }
 
 function toggleMute() {
-  if (!producer) return;
+  if (!audioProducer) return;
 
   isMuted = !isMuted;
 
   if (isMuted) {
-    producer.pause();
-    muteBtn.textContent = '🔇 Unmute';
-    muteBtn.classList.add('muted');
+    audioProducer.pause();
+    console.log('🔇 Microphone muted');
   } else {
-    producer.resume();
-    muteBtn.textContent = '🎤 Mute';
-    muteBtn.classList.remove('muted');
+    audioProducer.resume();
+    console.log('🎤 Microphone unmuted');
   }
 }
 
 function leaveChannel() {
-  // Stop audio stream
+  // Stop media streams
   if (audioStream) {
     audioStream.getTracks().forEach((track) => track.stop());
+  }
+  if (videoStream) {
+    videoStream.getTracks().forEach((track) => track.stop());
   }
 
   // Close transports
   if (sendTransport) sendTransport.close();
   if (recvTransport) recvTransport.close();
 
-  // Stop all consumer audio
+  // Stop all consumers
   for (const [, participant] of participants.entries()) {
-    if (participant.audio) {
-      participant.audio.pause();
-      participant.audio.srcObject = null;
-      // Remove from DOM
-      if (document.body.contains(participant.audio)) {
-        document.body.removeChild(participant.audio);
-      }
-    }
     if (participant.audioContext) {
       participant.audioContext.close();
     }
@@ -874,23 +962,23 @@ function leaveChannel() {
   }
 
   // Reset state
-  producer = null;
+  audioProducer = null;
+  videoProducer = null;
   sendTransport = null;
   recvTransport = null;
+  audioStream = null;
+  videoStream = null;
   consumers.clear();
   participants.clear();
   currentRoomId = null;
-  isMuted = false;
+  isAudioEnabled = true;
+  isVideoEnabled = true;
 
   // Reset UI
-  joinSection.style.display = 'block';
-  controlsSection.classList.remove('show');
-  statusDiv.classList.remove('show');
+  joinContainer.style.display = 'flex';
+  videoContainer.classList.remove('active');
+  videoGrid.innerHTML = '';
   joinBtn.disabled = false;
-  muteBtn.textContent = '🎤 Mute';
-  muteBtn.classList.remove('muted');
-  participantList.innerHTML =
-    '<div class="empty-state">No participants yet</div>';
 
   // Disconnect and reconnect socket to properly clean up server state
   socket.disconnect();
@@ -898,49 +986,17 @@ function leaveChannel() {
 }
 
 function addParticipant(clientId, isMe = false) {
-  if (participants.has(clientId) && participants.get(clientId).element) {
-    return; // Already added
-  }
-
   if (!participants.has(clientId)) {
     participants.set(clientId, {});
   }
 
-  const participant = participants.get(clientId);
-
-  // Remove empty state if exists
-  const emptyState = participantList.querySelector('.empty-state');
-  if (emptyState) emptyState.remove();
-
-  const el = document.createElement('div');
-  el.className = 'participant';
-  el.innerHTML = `
-    <div class="participant-icon">${clientId.substring(0, 2).toUpperCase()}</div>
-    <div class="participant-info">
-      <div class="participant-name">${isMe ? 'You' : `User ${clientId.substring(0, 8)}`}</div>
-      ${isMe ? '<div class="participant-you">(You)</div>' : ''}
-    </div>
-    <div class="audio-indicator"></div>
-  `;
-
-  participantList.appendChild(el);
-  participant.element = el;
+  // Update video grid when participant is added
+  updateVideoGrid();
 }
 
 function removeParticipant(clientId) {
   const participant = participants.get(clientId);
   if (participant) {
-    if (participant.element) {
-      participant.element.remove();
-    }
-    if (participant.audio) {
-      participant.audio.pause();
-      participant.audio.srcObject = null;
-      // Remove from DOM
-      if (document.body.contains(participant.audio)) {
-        document.body.removeChild(participant.audio);
-      }
-    }
     if (participant.audioContext) {
       participant.audioContext.close();
     }
@@ -953,14 +1009,163 @@ function removeParticipant(clientId) {
     participants.delete(clientId);
   }
 
-  // Show empty state if no participants
-  if (participantList.children.length === 0) {
-    participantList.innerHTML =
-      '<div class="empty-state">No participants yet</div>';
-  }
+  // Update video grid
+  updateVideoGrid();
 }
 
 function showStatus(message, type) {
   statusDiv.textContent = message;
   statusDiv.className = `status show ${type}`;
+}
+
+// Video functions
+async function consumeVideo(producerId, clientId) {
+  // Safety check: Never consume your own video
+  if (clientId === myClientId) {
+    console.log('  ⚠️ SKIP: Not consuming own video');
+    return;
+  }
+
+  try {
+    console.log('  📹 CONSUME: Consuming video from:', clientId);
+
+    const consumeParams = {
+      transportId: recvTransport.id,
+      producerId,
+      rtpCapabilities: device.rtpCapabilities,
+    };
+
+    const { id, kind, rtpParameters } = await socketRequest('consume', consumeParams);
+    console.log('  ✅ CONSUME: Got video consumer params:', { id, kind });
+
+    const consumer = await recvTransport.consume({
+      id,
+      producerId,
+      kind,
+      rtpParameters,
+    });
+
+    consumers.set(id, consumer);
+
+    // Resume consumer
+    await socketRequest('resumeConsumer', { consumerId: id });
+    console.log('  ✅ CONSUME: Video consumer resumed');
+
+    // Add video track to participant
+    if (!participants.has(clientId)) {
+      participants.set(clientId, {});
+    }
+    participants.get(clientId).videoTrack = consumer.track;
+    participants.get(clientId).videoConsumer = consumer;
+
+    // Update video tile
+    updateParticipantVideo(clientId);
+
+  } catch (error) {
+    console.error('  ❌ Failed to consume video:', error);
+  }
+}
+
+function updateParticipantVideo(clientId) {
+  const participant = participants.get(clientId);
+  if (!participant || !participant.videoTrack) return;
+
+  const tile = document.getElementById(`video-tile-${clientId}`);
+  if (!tile) return;
+
+  let video = tile.querySelector('video');
+  if (!video) {
+    video = document.createElement('video');
+    video.autoplay = true;
+    video.playsInline = true;
+    video.muted = (clientId === myClientId); // Mute own video
+    tile.querySelector('.no-video')?.remove();
+    tile.appendChild(video);
+  }
+
+  video.srcObject = new MediaStream([participant.videoTrack]);
+}
+
+function toggleMicrophone() {
+  if (audioProducer) {
+    isAudioEnabled = !isAudioEnabled;
+    if (isAudioEnabled) {
+      audioProducer.resume();
+      toggleMicBtn.textContent = '🎤';
+      toggleMicBtn.style.background = '';
+      console.log('🎤 Microphone enabled');
+    } else {
+      audioProducer.pause();
+      toggleMicBtn.textContent = '🔇';
+      toggleMicBtn.style.background = '#ea4335';
+      console.log('🔇 Microphone muted');
+    }
+  }
+}
+
+function toggleVideo() {
+  if (videoProducer) {
+    isVideoEnabled = !isVideoEnabled;
+    if (isVideoEnabled) {
+      videoProducer.resume();
+      toggleVideoBtn.textContent = '📹';
+      toggleVideoBtn.style.background = '';
+      console.log('📹 Video enabled');
+    } else {
+      videoProducer.pause();
+      toggleVideoBtn.textContent = '🚫';
+      toggleVideoBtn.style.background = '#ea4335';
+      console.log('📹 Video disabled');
+    }
+    updateParticipantVideo(myClientId);
+  }
+}
+
+function updateVideoGrid() {
+  // Clear grid
+  videoGrid.innerHTML = '';
+
+  const participantArray = Array.from(participants.entries());
+  const count = participantArray.length;
+
+  // Update grid class for layout
+  videoGrid.className = 'video-grid';
+  videoGrid.classList.add(`count-${count}`);
+
+  // Create video tiles
+  participantArray.forEach(([clientId, participant]) => {
+    const tile = document.createElement('div');
+    tile.className = 'video-tile';
+    tile.id = `video-tile-${clientId}`;
+
+    const isMe = (clientId === myClientId);
+    const name = isMe ? 'You' : `User ${clientId.substring(0, 8)}`;
+
+    // Default no-video view
+    tile.innerHTML = `
+      <div class="no-video">
+        <div class="no-video-avatar">${name.charAt(0).toUpperCase()}</div>
+      </div>
+      <div class="participant-name">${name}</div>
+    `;
+
+    videoGrid.appendChild(tile);
+
+    // If this is me, show my camera
+    if (isMe && videoStream) {
+      const video = document.createElement('video');
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = videoStream;
+      tile.querySelector('.no-video').remove();
+      tile.insertBefore(video, tile.querySelector('.participant-name'));
+    }
+    // If this is someone else and they have video, it will be added when consumed
+    else if (participant.videoTrack) {
+      updateParticipantVideo(clientId);
+    }
+  });
+
+  console.log(`📹 Video grid updated with ${count} participants`);
 }

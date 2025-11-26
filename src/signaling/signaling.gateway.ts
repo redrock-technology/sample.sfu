@@ -65,7 +65,10 @@ export class SignalingGateway implements OnGatewayDisconnect {
       if (otherId !== client.id) {
         const producers = this.clientProducers.get(otherId) || [];
         existingProducers.push(
-          ...producers.map((pid) => ({ producerId: pid, clientId: otherId })),
+          ...producers.map((pid) => {
+            const producer = this.ms.producers.get(pid);
+            return { producerId: pid, clientId: otherId, kind: producer?.kind || 'audio' };
+          }),
         );
       }
     }
@@ -176,7 +179,7 @@ export class SignalingGateway implements OnGatewayDisconnect {
 
       client
         .to(roomId)
-        .emit('newProducer', { producerId: producer.id, clientId: client.id });
+        .emit('newProducer', { producerId: producer.id, clientId: client.id, kind: producer.kind });
     } else {
       console.log(`  ⚠️ Client not in any room`);
     }
