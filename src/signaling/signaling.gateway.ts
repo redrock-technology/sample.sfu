@@ -145,7 +145,7 @@ export class SignalingGateway implements OnGatewayDisconnect {
   @SubscribeMessage('produce')
   async produce(@MessageBody() data, @ConnectedSocket() client: Socket) {
     console.log(
-      `📤 [${client.id}] Producing audio on transport: ${data.transportId}`,
+      `📤 [${client.id}] Producing ${data.kind} on transport: ${data.transportId}`,
     );
 
     const transport = this.ms.transports.get(data.transportId);
@@ -155,7 +155,7 @@ export class SignalingGateway implements OnGatewayDisconnect {
     }
 
     const producer = await transport.produce({
-      kind: 'audio',
+      kind: data.kind,
       rtpParameters: data.rtpParameters,
     });
 
