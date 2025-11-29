@@ -227,7 +227,13 @@ async function joinChannel() {
     await createRecvTransport();
     console.log('✅ Receive transport created');
 
-    // Get microphone and camera access
+    // Join room FIRST (before publishing)
+    console.log('🚪 Joining room:', roomId);
+    const { existingProducers } = await socketRequest('join', { roomId });
+    console.log('✅ Joined room. Existing producers:', existingProducers);
+    currentRoomId = roomId;
+
+    // NOW publish microphone and camera (so others in room get notified)
     console.log('🎤 Publishing microphone...');
     await publishMic();
     console.log('✅ Microphone published');
@@ -235,12 +241,6 @@ async function joinChannel() {
     console.log('📹 Publishing camera...');
     await publishCamera();
     console.log('✅ Camera published');
-
-    // Join room
-    console.log('🚪 Joining room:', roomId);
-    const { existingProducers } = await socketRequest('join', { roomId });
-    console.log('✅ Joined room. Existing producers:', existingProducers);
-    currentRoomId = roomId;
 
     // Add myself to participants with my own video
     addParticipant(myClientId, true);
