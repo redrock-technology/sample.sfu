@@ -49,74 +49,98 @@
     }
     
     .video-container.active {
-      display: flex;
-      flex-direction: column;
+      display: block;
     }
     
     .video-grid {
-      flex: 1;
+      width: 100%;
+      height: 100%;
       display: grid;
-      gap: 8px;
-      padding: 8px;
+      gap: 4px;
+      padding: 4px;
+      padding-bottom: 90px;  /* Space for floating buttons */
       grid-auto-rows: 1fr;
-      overflow: auto;  /* Allow scrolling if needed */
-      position: relative;
-      z-index: 1;  /* Below control bar */
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     
-    /* Grid layouts based on participant count */
-    .video-grid.count-1 { grid-template-columns: 1fr; }
-    .video-grid.count-2 { grid-template-columns: repeat(2, 1fr); }
-    .video-grid.count-3, .video-grid.count-4 { grid-template-columns: repeat(2, 1fr); }
-    .video-grid.count-5, .video-grid.count-6 { grid-template-columns: repeat(3, 1fr); }
-    .video-grid.count-7, .video-grid.count-8, .video-grid.count-9 { grid-template-columns: repeat(3, 1fr); }
-    
-    /* Mobile: Stack videos vertically (portrait mode) */
-    @media (max-width: 768px) and (orientation: portrait) {
+    /* Desktop Layout (width > height) */
+    @media (orientation: landscape) {
+      .video-grid.count-1 { grid-template-columns: 1fr; }
+      .video-grid.count-2 { grid-template-columns: repeat(2, 1fr); }
+      .video-grid.count-3, .video-grid.count-4 { grid-template-columns: repeat(2, 1fr); }
+      .video-grid.count-5, .video-grid.count-6 { grid-template-columns: repeat(3, 1fr); }
+      .video-grid.count-7, .video-grid.count-8, .video-grid.count-9 { grid-template-columns: repeat(3, 1fr); }
+      
       .video-grid {
-        grid-template-columns: 1fr !important;  /* Single column */
-        gap: 12px;
-      }
-      
-      .video-tile {
-        min-height: 250px;  /* Slightly taller on mobile */
-        max-height: 300px;
-      }
-      
-      .control-bar {
-        padding: 12px;
-        gap: 16px;
-      }
-      
-      .control-bar button {
-        width: 52px;
-        height: 52px;
-        font-size: 22px;
+        gap: 8px;
+        padding: 8px;
+        padding-bottom: 90px;
       }
     }
     
-    /* Tablet/Mobile landscape: 2 columns max */
-    @media (max-width: 1024px) and (orientation: landscape) {
-      .video-grid.count-3,
+    /* Mobile Layout (width <= height) */
+    @media (orientation: portrait) {
+      /* 1 user: Full screen */
+      .video-grid.count-1 {
+        grid-template-columns: 1fr;
+        gap: 0;
+        padding: 0;
+        padding-bottom: 90px;
+      }
+      
+      .video-grid.count-1 .video-tile {
+        border-radius: 0;
+        min-height: 100%;
+      }
+      
+      /* 2-3 users: Vertical split (half screen each) */
+      .video-grid.count-2,
+      .video-grid.count-3 {
+        grid-template-columns: 1fr;
+        grid-template-rows: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 4px;
+        padding: 4px;
+        padding-bottom: 90px;
+      }
+      
+      /* 4+ users: 2 column grid */
       .video-grid.count-4,
       .video-grid.count-5,
       .video-grid.count-6,
       .video-grid.count-7,
       .video-grid.count-8,
       .video-grid.count-9 {
-        grid-template-columns: repeat(2, 1fr) !important;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+        padding: 4px;
+        padding-bottom: 90px;
       }
     }
     
     .video-tile {
       position: relative;
-      background: #3c4043;
+      background: #000;
       border-radius: 8px;
       overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 200px;
+      min-height: 150px;
+    }
+    
+    /* Desktop: Better min-height */
+    @media (orientation: landscape) {
+      .video-tile {
+        min-height: 200px;
+      }
+    }
+    
+    /* Mobile portrait: Optimize for vertical space */
+    @media (orientation: portrait) {
+      .video-tile {
+        min-height: 180px;
+      }
     }
     
     .video-tile video {
@@ -161,17 +185,22 @@
       font-weight: 600;
     }
     
-    /* Control Bar */
+    /* Floating Control Bar */
     .control-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 20px;
-      background: #202124;
-      gap: 12px;
-      position: relative;
+      padding: 12px 24px;
+      background: rgba(32, 33, 36, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 50px;
+      gap: 16px;
       z-index: 1000;
-      flex-shrink: 0;  /* Prevent shrinking */
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
     
     .control-bar button {
@@ -184,11 +213,16 @@
       transition: all 0.2s;
       background: #3c4043;
       color: white;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     
     .control-bar button:hover {
       background: #4f5154;
       transform: scale(1.1);
+    }
+    
+    .control-bar button:active {
+      transform: scale(0.95);
     }
     
     .control-bar button.danger {
@@ -197,6 +231,21 @@
     
     .control-bar button.danger:hover {
       background: #d33426;
+    }
+    
+    /* Mobile: Smaller floating buttons */
+    @media (orientation: portrait) {
+      .control-bar {
+        bottom: 16px;
+        padding: 10px 20px;
+        gap: 12px;
+      }
+      
+      .control-bar button {
+        width: 50px;
+        height: 50px;
+        font-size: 22px;
+      }
     }
 
     h1 {

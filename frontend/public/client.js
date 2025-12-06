@@ -188,6 +188,28 @@ function setupSocketHandlers() {
 initializeSocket();
 loadDevices();
 
+// Handle orientation changes and window resize
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    if (currentRoomId) {
+      console.log('🔄 Orientation/resize detected, updating grid...');
+      updateVideoGrid();
+    }
+  }, 200);
+});
+
+// Also listen for orientation change event
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (currentRoomId) {
+      console.log('🔄 Orientation changed, updating grid...');
+      updateVideoGrid();
+    }
+  }, 300);
+});
+
 // Global audio enabler - ensures all audio elements can play
 let audioEnabled = false;
 document.addEventListener(
@@ -1209,12 +1231,23 @@ function toggleVideo() {
   }
 }
 
+function isMobile() {
+  // Mobile = width <= height (portrait orientation)
+  return window.innerWidth <= window.innerHeight;
+}
+
 function updateVideoGrid() {
   // Clear grid
   videoGrid.innerHTML = '';
 
   const participantArray = Array.from(participants.entries());
   const count = participantArray.length;
+
+  // Detect device type
+  const mobile = isMobile();
+  const deviceType = mobile ? 'mobile' : 'desktop';
+  
+  console.log(`📱 Device: ${deviceType}, Participants: ${count}, Size: ${window.innerWidth}x${window.innerHeight}`);
 
   // Update grid class for layout
   videoGrid.className = 'video-grid';
