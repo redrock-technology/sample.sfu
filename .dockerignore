@@ -44,4 +44,4 @@ docker-compose*.yml
 .editorconfig
 .prettierrc
 .eslintrc.js
-
+.env

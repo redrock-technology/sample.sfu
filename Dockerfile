@@ -21,6 +21,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+COPY .env.deploy .env
+
 # Build the NestJS application
 RUN npm run build
 

@@ -46,10 +46,12 @@
       width: 100vw;
       height: 100vh;
       background: #202124;
+      -webkit-overflow-scrolling: touch;
     }
     
     .video-container.active {
-      display: block;
+      display: block !important;
+      visibility: visible !important;
     }
     
     .video-grid {
@@ -191,16 +193,22 @@
       bottom: 20px;
       left: 50%;
       transform: translateX(-50%);
+      -webkit-transform: translateX(-50%);
       display: flex;
+      display: -webkit-flex;
       justify-content: center;
+      -webkit-justify-content: center;
       align-items: center;
+      -webkit-align-items: center;
       padding: 12px 24px;
       background: rgba(32, 33, 36, 0.95);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border-radius: 50px;
       gap: 16px;
       z-index: 1000;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      -webkit-box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     }
     
     .control-bar button {
@@ -211,18 +219,24 @@
       cursor: pointer;
       font-size: 24px;
       transition: all 0.2s;
+      -webkit-transition: all 0.2s;
       background: #3c4043;
       color: white;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      -webkit-box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      -webkit-appearance: none;
+      -webkit-tap-highlight-color: transparent;
     }
     
     .control-bar button:hover {
       background: #4f5154;
       transform: scale(1.1);
+      -webkit-transform: scale(1.1);
     }
     
     .control-bar button:active {
       transform: scale(0.95);
+      -webkit-transform: scale(0.95);
     }
     
     .control-bar button.danger {
@@ -500,12 +514,13 @@
     <div class="video-grid" id="videoGrid">
       <!-- Video tiles will be added here dynamically -->
     </div>
-    
-    <div class="control-bar">
-      <button id="toggleMicBtn" title="Toggle Microphone">🎤</button>
-      <button id="toggleVideoBtn" title="Toggle Video">📹</button>
-      <button id="leaveCallBtn" class="danger" title="Leave Call">📞</button>
-    </div>
+  </div>
+  
+  <!-- Floating Control Bar (outside video container for Safari compatibility) -->
+  <div class="control-bar" id="controlBar" style="display: none;">
+    <button id="toggleMicBtn" title="Toggle Microphone">🎤</button>
+    <button id="toggleVideoBtn" title="Toggle Video">📹</button>
+    <button id="leaveCallBtn" class="danger" title="Leave Call">📞</button>
   </div>
 
   <script type="importmap">

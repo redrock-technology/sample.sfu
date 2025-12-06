@@ -314,6 +314,7 @@ async function joinChannel() {
     // Switch to video conference view
     joinContainer.style.display = 'none';
     videoContainer.classList.add('active');
+    document.getElementById('controlBar').style.display = 'flex';  // Show control bar
     updateVideoGrid();
     console.log('✅ Connection complete!');
   } catch (error) {
@@ -1085,6 +1086,7 @@ function leaveChannel() {
   // Reset UI
   joinContainer.style.display = 'flex';
   videoContainer.classList.remove('active');
+  document.getElementById('controlBar').style.display = 'none';  // Hide control bar
   videoGrid.innerHTML = '';
   joinBtn.disabled = false;
 
