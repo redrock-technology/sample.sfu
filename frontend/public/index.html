@@ -59,6 +59,9 @@
       gap: 8px;
       padding: 8px;
       grid-auto-rows: 1fr;
+      overflow: auto;  /* Allow scrolling if needed */
+      position: relative;
+      z-index: 1;  /* Below control bar */
     }
     
     /* Grid layouts based on participant count */
@@ -84,6 +87,7 @@
       height: 100%;
       object-fit: cover;
       background: #000;
+      transform: scaleX(-1);  /* Mirror/flip camera horizontally */
     }
     
     .video-tile .participant-name {
@@ -128,6 +132,9 @@
       padding: 20px;
       background: #202124;
       gap: 12px;
+      position: relative;
+      z-index: 1000;
+      flex-shrink: 0;  /* Prevent shrinking */
     }
     
     .control-bar button {

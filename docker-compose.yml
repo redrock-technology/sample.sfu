@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: sample-sfu
+    container_name: sfu
     restart: always
     ports:
       - "3000:3000"
@@ -24,43 +24,43 @@ services:
     networks:
       - sfu-network
 
-  postgres:
-    image: postgres:17.4
-    container_name: postgres
-    restart: always
-    environment:
-      POSTGRES_USER: hasura
-      POSTGRES_PASSWORD: hasura
-      POSTGRES_DB: hasura
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - sfu-network
+#   postgres:
+#     image: postgres:17.4
+#     container_name: postgres
+#     restart: always
+#     environment:
+#       POSTGRES_USER: hasura
+#       POSTGRES_PASSWORD: hasura
+#       POSTGRES_DB: hasura
+#     volumes:
+#       - postgres_data:/var/lib/postgresql/data
+#     ports:
+#       - "5432:5432"
+#     networks:
+#       - sfu-network
 
-  hasura:
-    image: hasura/graphql-engine:v2.41.0
-    container_name: hasura
-    restart: always
-    depends_on:
-      - postgres
-    ports:
-      - "8080:8080"
-    environment:
-      HASURA_GRAPHQL_DATABASE_URL: postgres://hasura:hasura@postgres:5432/hasura
-      HASURA_GRAPHQL_ADMIN_SECRET: "123456"
-      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
-      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: "public"
-      HASURA_GRAPHQL_ENABLED_LOG_TYPES: "startup,http-log,webhook-log,websocket-log,query-log"
-    volumes:
-      - ./hasura/metadata:/hasura-metadata
-      - ./hasura/migrations:/hasura-migrations
-    networks:
-      - sfu-network
+#   hasura:
+#     image: hasura/graphql-engine:v2.41.0
+#     container_name: hasura
+#     restart: always
+#     depends_on:
+#       - postgres
+#     ports:
+#       - "8080:8080"
+#     environment:
+#       HASURA_GRAPHQL_DATABASE_URL: postgres://hasura:hasura@postgres:5432/hasura
+#       HASURA_GRAPHQL_ADMIN_SECRET: "123456"
+#       HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+#       HASURA_GRAPHQL_UNAUTHORIZED_ROLE: "public"
+#       HASURA_GRAPHQL_ENABLED_LOG_TYPES: "startup,http-log,webhook-log,websocket-log,query-log"
+#     volumes:
+#       - ./hasura/metadata:/hasura-metadata
+#       - ./hasura/migrations:/hasura-migrations
+#     networks:
+#       - sfu-network
 
-volumes:
-  postgres_data:
+# volumes:
+#   postgres_data:
 
 networks:
   sfu-network:

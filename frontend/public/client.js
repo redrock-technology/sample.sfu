@@ -47,13 +47,18 @@ const toggleVideoBtn = document.getElementById('toggleVideoBtn');
 const leaveCallBtn = document.getElementById('leaveCallBtn');
 
 // Event Listeners
-joinBtn.onclick = joinChannel;
-toggleMicBtn.onclick = toggleMicrophone;
-toggleVideoBtn.onclick = toggleVideo;
-leaveCallBtn.onclick = leaveChannel;
+joinBtn.addEventListener('click', joinChannel);
+toggleMicBtn.addEventListener('click', toggleMicrophone);
+toggleVideoBtn.addEventListener('click', toggleVideo);
+leaveCallBtn.addEventListener('click', leaveChannel);
 channelInput.addEventListener('keypress', (e) => {
   if (e.key === 'Enter') joinChannel();
 });
+
+// Debug: Log button clicks
+toggleMicBtn.addEventListener('click', () => console.log('🎤 Mic button clicked'));
+toggleVideoBtn.addEventListener('click', () => console.log('📹 Video button clicked'));
+leaveCallBtn.addEventListener('click', () => console.log('📞 Leave button clicked'));
 
 // Load available microphones and cameras on page load
 async function loadDevices() {
