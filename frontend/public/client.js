@@ -274,14 +274,29 @@ async function joinChannel() {
     console.log('✅ Joined room. Existing producers:', existingProducers);
     currentRoomId = roomId;
 
+    // Check user preferences
+    const startMuted = document.getElementById('joinMuted').checked;
+    const startCameraOff = document.getElementById('joinCameraOff').checked;
+    console.log('📋 Join options:', { startMuted, startCameraOff });
+
     // NOW publish microphone and camera (so others in room get notified)
     console.log('🎤 Publishing microphone...');
-    await publishMic();
-    console.log('✅ Microphone published');
+    await publishMic(startMuted);
+    console.log('✅ Microphone published', startMuted ? '(muted)' : '(unmuted)');
 
-    console.log('📹 Publishing camera...');
-    await publishCamera();
-    console.log('✅ Camera published');
+    if (!startCameraOff) {
+      console.log('📹 Publishing camera...');
+      await publishCamera();
+      console.log('✅ Camera published');
+      isVideoEnabled = true;
+      toggleVideoBtn.textContent = '📹';
+      toggleVideoBtn.style.background = '';
+    } else {
+      console.log('📹 Camera disabled by user');
+      isVideoEnabled = false;
+      toggleVideoBtn.textContent = '🚫';
+      toggleVideoBtn.style.background = '#ea4335';
+    }
 
     // Add myself to participants with my own video
     addParticipant(myClientId, true);
@@ -428,7 +443,7 @@ async function createRecvTransport() {
   });
 }
 
-async function publishMic() {
+async function publishMic(startMuted = false) {
   try {
     console.log('  🎤 Requesting microphone access...');
     const audioConstraints = {
@@ -469,16 +484,34 @@ async function publishMic() {
     });
     console.log('  ✅ Audio Producer created:', audioProducer.id);
     console.log('  📤 Producer paused:', audioProducer.paused);
+    
+    // Start muted if requested
+    if (startMuted) {
+      audioProducer.pause();
+      audioProducer.track.enabled = false;  // Disable the actual microphone track
+      isAudioEnabled = false;
+      toggleMicBtn.textContent = '🔇';
+      toggleMicBtn.style.background = '#ea4335';
+      console.log('  🔇 Microphone started muted (track disabled)');
+    } else {
+      isAudioEnabled = true;
+      toggleMicBtn.textContent = '🎤';
+      toggleMicBtn.style.background = '';
+    }
     console.log('  📤 Producer track:', audioProducer.track);
     console.log('  📤 Producer codec options: high quality Opus');
 
-    // Make sure producer is not paused
-    if (audioProducer.paused) {
-      console.log('  ⚠️ Producer is paused, resuming...');
-      await audioProducer.resume();
-      console.log('  ✅ Producer resumed');
+    // Only resume if not starting muted
+    if (!startMuted) {
+      if (audioProducer.paused) {
+        console.log('  ⚠️ Producer is paused, resuming...');
+        await audioProducer.resume();
+        console.log('  ✅ Producer resumed');
+      } else {
+        console.log('  ✅ Producer is already active (not paused)');
+      }
     } else {
-      console.log('  ✅ Producer is already active (not paused)');
+      console.log('  ✅ Producer staying paused (user joined muted)');
     }
 
     audioProducer.on('trackended', () => {
@@ -1203,20 +1236,23 @@ function toggleMicrophone() {
     isAudioEnabled = !isAudioEnabled;
     if (isAudioEnabled) {
       audioProducer.resume();
+      audioProducer.track.enabled = true;  // Enable the microphone track
       toggleMicBtn.textContent = '🎤';
       toggleMicBtn.style.background = '';
-      console.log('🎤 Microphone enabled');
+      console.log('🎤 Microphone enabled (track enabled)');
     } else {
       audioProducer.pause();
+      audioProducer.track.enabled = false;  // Disable the microphone track
       toggleMicBtn.textContent = '🔇';
       toggleMicBtn.style.background = '#ea4335';
-      console.log('🔇 Microphone muted');
+      console.log('🔇 Microphone muted (track disabled)');
     }
   }
 }
 
-function toggleVideo() {
+async function toggleVideo() {
   if (videoProducer) {
+    // Video producer exists, just toggle pause/resume
     isVideoEnabled = !isVideoEnabled;
     if (isVideoEnabled) {
       videoProducer.resume();
@@ -1230,6 +1266,19 @@ function toggleVideo() {
       console.log('📹 Video disabled');
     }
     updateParticipantVideo(myClientId);
+  } else if (!isVideoEnabled) {
+    // Video producer doesn't exist (joined with camera off), create it now
+    try {
+      console.log('📹 Starting camera for the first time...');
+      await publishCamera();
+      isVideoEnabled = true;
+      toggleVideoBtn.textContent = '📹';
+      toggleVideoBtn.style.background = '';
+      console.log('✅ Camera started');
+      updateVideoGrid(); // Refresh grid to show our video
+    } catch (error) {
+      console.error('❌ Failed to start camera:', error);
+    }
   }
 }
 
