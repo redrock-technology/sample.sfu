@@ -71,6 +71,43 @@
     .video-grid.count-5, .video-grid.count-6 { grid-template-columns: repeat(3, 1fr); }
     .video-grid.count-7, .video-grid.count-8, .video-grid.count-9 { grid-template-columns: repeat(3, 1fr); }
     
+    /* Mobile: Stack videos vertically (portrait mode) */
+    @media (max-width: 768px) and (orientation: portrait) {
+      .video-grid {
+        grid-template-columns: 1fr !important;  /* Single column */
+        gap: 12px;
+      }
+      
+      .video-tile {
+        min-height: 250px;  /* Slightly taller on mobile */
+        max-height: 300px;
+      }
+      
+      .control-bar {
+        padding: 12px;
+        gap: 16px;
+      }
+      
+      .control-bar button {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+      }
+    }
+    
+    /* Tablet/Mobile landscape: 2 columns max */
+    @media (max-width: 1024px) and (orientation: landscape) {
+      .video-grid.count-3,
+      .video-grid.count-4,
+      .video-grid.count-5,
+      .video-grid.count-6,
+      .video-grid.count-7,
+      .video-grid.count-8,
+      .video-grid.count-9 {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+    
     .video-tile {
       position: relative;
       background: #3c4043;
