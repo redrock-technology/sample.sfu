@@ -26,9 +26,9 @@ export class MediasoupService implements OnModuleInit {
           channels: 2,
           parameters: {
             'sprop-stereo': 1,
-            'stereo': 1,
-            'useinbandfec': 1, // Forward error correction
-            'usedtx': 0, // Disable discontinuous transmission
+            stereo: 1,
+            useinbandfec: 1, // Forward error correction
+            usedtx: 0, // Disable discontinuous transmission
           },
         },
         {
@@ -71,7 +71,7 @@ export class MediasoupService implements OnModuleInit {
 
   async createWebRtcTransport(clientId: string) {
     const announcedIp = process.env.ANNOUNCED_IP || '127.0.0.1';
-    
+
     const transport = await this.router.createWebRtcTransport({
       listenIps: [{ ip: '0.0.0.0', announcedIp }],
       enableUdp: true,
@@ -87,7 +87,10 @@ export class MediasoupService implements OnModuleInit {
       this.userTransports.set(clientId, {});
     }
 
-    console.log('Transport created with ICE candidates:', transport.iceCandidates);
+    console.log(
+      'Transport created with ICE candidates:',
+      transport.iceCandidates,
+    );
 
     return transport;
   }

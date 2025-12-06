@@ -67,7 +67,11 @@ export class SignalingGateway implements OnGatewayDisconnect {
         existingProducers.push(
           ...producers.map((pid) => {
             const producer = this.ms.producers.get(pid);
-            return { producerId: pid, clientId: otherId, kind: producer?.kind || 'audio' };
+            return {
+              producerId: pid,
+              clientId: otherId,
+              kind: producer?.kind || 'audio',
+            };
           }),
         );
       }
@@ -177,9 +181,11 @@ export class SignalingGateway implements OnGatewayDisconnect {
         `  📢 Notifying ${otherClients.length} other client(s) in room ${roomId}`,
       );
 
-      client
-        .to(roomId)
-        .emit('newProducer', { producerId: producer.id, clientId: client.id, kind: producer.kind });
+      client.to(roomId).emit('newProducer', {
+        producerId: producer.id,
+        clientId: client.id,
+        kind: producer.kind,
+      });
     } else {
       console.log(`  ⚠️ Client not in any room`);
     }
@@ -206,11 +212,14 @@ export class SignalingGateway implements OnGatewayDisconnect {
     }
 
     // Safety check: Verify client isn't consuming their own producer
-    const producerClientId = Array.from(this.clientProducers.entries())
-      .find(([, producers]) => producers.includes(data.producerId))?.[0];
-    
+    const producerClientId = Array.from(this.clientProducers.entries()).find(
+      ([, producers]) => producers.includes(data.producerId),
+    )?.[0];
+
     if (producerClientId === client.id) {
-      console.warn(`  ⚠️ Client ${client.id} attempting to consume own producer - blocking`);
+      console.warn(
+        `  ⚠️ Client ${client.id} attempting to consume own producer - blocking`,
+      );
       throw new Error('Cannot consume own producer');
     }
 
@@ -228,7 +237,7 @@ export class SignalingGateway implements OnGatewayDisconnect {
     });
 
     this.ms.consumers.set(consumer.id, consumer);
-    
+
     console.log(`  📊 Consumer created:`, {
       id: consumer.id,
       kind: consumer.kind,

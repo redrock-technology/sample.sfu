@@ -59,20 +59,28 @@ channelInput.addEventListener('keypress', (e) => {
 async function loadDevices() {
   try {
     // Request permission first to get device labels
-    const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-    tempStream.getTracks().forEach(track => track.stop());
-    
+    const tempStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: true,
+    });
+    tempStream.getTracks().forEach((track) => track.stop());
+
     const devices = await navigator.mediaDevices.enumerateDevices();
-    const audioInputs = devices.filter(device => device.kind === 'audioinput');
-    const videoInputs = devices.filter(device => device.kind === 'videoinput');
-    
+    const audioInputs = devices.filter(
+      (device) => device.kind === 'audioinput',
+    );
+    const videoInputs = devices.filter(
+      (device) => device.kind === 'videoinput',
+    );
+
     console.log('🎤 Available microphones:', audioInputs);
     console.log('📹 Available cameras:', videoInputs);
-    
+
     // Load microphones
     microphoneSelect.innerHTML = '';
     if (audioInputs.length === 0) {
-      microphoneSelect.innerHTML = '<option value="">No microphones found</option>';
+      microphoneSelect.innerHTML =
+        '<option value="">No microphones found</option>';
     } else {
       audioInputs.forEach((device, index) => {
         const option = document.createElement('option');
@@ -83,7 +91,7 @@ async function loadDevices() {
       selectedMicrophoneId = audioInputs[0].deviceId;
       console.log('✅ Default microphone:', audioInputs[0].label);
     }
-    
+
     // Load cameras
     cameraSelect.innerHTML = '';
     if (videoInputs.length === 0) {
@@ -98,10 +106,10 @@ async function loadDevices() {
       selectedCameraId = videoInputs[0].deviceId;
       console.log('✅ Default camera:', videoInputs[0].label);
     }
-    
   } catch (error) {
     console.error('❌ Failed to load devices:', error);
-    microphoneSelect.innerHTML = '<option value="">Error loading microphones</option>';
+    microphoneSelect.innerHTML =
+      '<option value="">Error loading microphones</option>';
     cameraSelect.innerHTML = '<option value="">Error loading cameras</option>';
   }
 }
@@ -109,12 +117,18 @@ async function loadDevices() {
 // Update selected devices when user changes selection
 microphoneSelect.onchange = () => {
   selectedMicrophoneId = microphoneSelect.value;
-  console.log('🎤 Microphone changed to:', microphoneSelect.options[microphoneSelect.selectedIndex].text);
+  console.log(
+    '🎤 Microphone changed to:',
+    microphoneSelect.options[microphoneSelect.selectedIndex].text,
+  );
 };
 
 cameraSelect.onchange = () => {
   selectedCameraId = cameraSelect.value;
-  console.log('📹 Camera changed to:', cameraSelect.options[cameraSelect.selectedIndex].text);
+  console.log(
+    '📹 Camera changed to:',
+    cameraSelect.options[cameraSelect.selectedIndex].text,
+  );
 };
 
 // Initialize socket connection with config from server
@@ -123,13 +137,13 @@ async function initializeSocket() {
     const response = await fetch('/config');
     const config = await response.json();
     console.log('🔧 Server config:', config);
-    
+
     // Initialize socket with the PUBLIC_URL from server
     socket = io(config.socketUrl);
-    
+
     // Setup socket event handlers
     setupSocketHandlers();
-    
+
     console.log('✅ Socket initialized with URL:', config.socketUrl);
   } catch (error) {
     console.error('❌ Failed to fetch config, using current origin:', error);
@@ -237,7 +251,7 @@ async function joinChannel() {
     console.log('🎤 Publishing microphone...');
     await publishMic();
     console.log('✅ Microphone published');
-    
+
     console.log('📹 Publishing camera...');
     await publishCamera();
     console.log('✅ Camera published');
@@ -394,13 +408,13 @@ async function publishMic() {
       noiseSuppression: true,
       autoGainControl: true,
     };
-    
+
     // Use selected microphone if one is chosen
     if (selectedMicrophoneId) {
       audioConstraints.deviceId = { exact: selectedMicrophoneId };
       console.log('  🎤 Using selected microphone:', selectedMicrophoneId);
     }
-    
+
     audioStream = await navigator.mediaDevices.getUserMedia({
       audio: audioConstraints,
     });
@@ -414,16 +428,16 @@ async function publishMic() {
       readyState: track.readyState,
     });
 
-    audioProducer = await sendTransport.produce({ 
+    audioProducer = await sendTransport.produce({
       track,
       codecOptions: {
         opusStereo: true,
         opusFec: true, // Forward error correction
-        opusDtx: false, // Disable discontinuous transmission 
+        opusDtx: false, // Disable discontinuous transmission
         opusMaxPlaybackRate: 48000,
         opusMaxAverageBitrate: 510000, // Maximum bitrate for Opus
         opusPtime: 20,
-      }
+      },
     });
     console.log('  ✅ Audio Producer created:', audioProducer.id);
     console.log('  📤 Producer paused:', audioProducer.paused);
@@ -517,13 +531,13 @@ async function publishCamera() {
       height: { ideal: 720 },
       frameRate: { ideal: 30 },
     };
-    
+
     // Use selected camera if one is chosen
     if (selectedCameraId) {
       videoConstraints.deviceId = { exact: selectedCameraId };
       console.log('  📹 Using selected camera:', selectedCameraId);
     }
-    
+
     videoStream = await navigator.mediaDevices.getUserMedia({
       video: videoConstraints,
     });
@@ -537,7 +551,7 @@ async function publishCamera() {
       label: track.label,
     });
 
-    videoProducer = await sendTransport.produce({ 
+    videoProducer = await sendTransport.produce({
       track,
       encodings: [
         { maxBitrate: 100000 },
@@ -546,7 +560,7 @@ async function publishCamera() {
       ],
       codecOptions: {
         videoGoogleStartBitrate: 1000,
-      }
+      },
     });
     console.log('  ✅ Video producer created:', videoProducer.id);
 
@@ -557,7 +571,6 @@ async function publishCamera() {
     videoProducer.on('transportclose', () => {
       console.log('  ⚠️ Video producer transport closed');
     });
-
   } catch (error) {
     console.error('  ❌ Failed to get camera access:', error);
     throw error;
@@ -567,7 +580,13 @@ async function publishCamera() {
 async function consumeAudio(producerId, clientId) {
   // Safety check: Never consume your own audio (prevent echo)
   if (clientId === myClientId) {
-    console.log('  ⚠️ SKIP: Not consuming own producer (clientId:', clientId, '=== myClientId:', myClientId, ')');
+    console.log(
+      '  ⚠️ SKIP: Not consuming own producer (clientId:',
+      clientId,
+      '=== myClientId:',
+      myClientId,
+      ')',
+    );
     return;
   }
 
@@ -610,7 +629,7 @@ async function consumeAudio(producerId, clientId) {
     });
 
     consumers.set(id, consumer);
-    
+
     console.log('  📊 Consumer details:', {
       id: consumer.id,
       kind: consumer.kind,
@@ -623,12 +642,17 @@ async function consumeAudio(producerId, clientId) {
     console.log('  ▶️ CONSUME: Resuming consumer...');
     await socketRequest('resumeConsumer', { consumerId: id });
     console.log('  ✅ CONSUME: Consumer resumed');
-    console.log('  📊 After resume - paused:', consumer.paused, 'producerPaused:', consumer.producerPaused);
+    console.log(
+      '  📊 After resume - paused:',
+      consumer.paused,
+      'producerPaused:',
+      consumer.producerPaused,
+    );
 
     // Create audio element and play
     console.log('  🔊 CONSUME: Creating audio element...');
     const stream = new MediaStream([consumer.track]);
-    
+
     // Create and configure audio element
     const audio = document.createElement('audio');
     audio.srcObject = stream;
@@ -636,37 +660,41 @@ async function consumeAudio(producerId, clientId) {
     audio.playsInline = true;
     audio.volume = 0;
     audio.muted = true; // MUTED - Web Audio API will handle playback
-    
+
     // Don't add to DOM - we only use Web Audio API for playback
     audio.style.display = 'none';
-    
+
     console.log('  🔊 CONSUME: Audio element created and added to DOM');
     console.log('  🔊 CONSUME: Stream active:', stream.active);
     console.log('  🔊 CONSUME: Track count:', stream.getTracks().length);
-    
+
     // CRITICAL FIX: Route through Web Audio API directly to speakers!
     try {
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const audioContext = new (window.AudioContext ||
+        window.webkitAudioContext)();
       console.log('  🔊 Creating AudioContext, state:', audioContext.state);
       console.log('  🔊 AudioContext destination:', audioContext.destination);
       console.log('  🔊 Stream tracks:', stream.getTracks());
-      console.log('  🔊 Track[0] readyState:', stream.getTracks()[0].readyState);
+      console.log(
+        '  🔊 Track[0] readyState:',
+        stream.getTracks()[0].readyState,
+      );
       console.log('  🔊 Track[0] enabled:', stream.getTracks()[0].enabled);
       console.log('  🔊 Track[0] muted:', stream.getTracks()[0].muted);
-      
+
       if (audioContext.state === 'suspended') {
         await audioContext.resume();
         console.log('  ✅ AudioContext resumed to:', audioContext.state);
       }
-      
+
       // Create source from stream
       const source = audioContext.createMediaStreamSource(stream);
       console.log('  ✅ MediaStreamSource created:', source);
-      
+
       // Create pre-gain (moderate boost)
       const preGain = audioContext.createGain();
       preGain.gain.value = 3.0; // Moderate 3x boost
-      
+
       // Create dynamic compressor to prevent distortion and boost quiet parts
       const compressor = audioContext.createDynamicsCompressor();
       compressor.threshold.setValueAtTime(-30, audioContext.currentTime); // Start compressing at -30dB
@@ -674,52 +702,72 @@ async function consumeAudio(producerId, clientId) {
       compressor.ratio.setValueAtTime(12, audioContext.currentTime); // Strong compression ratio
       compressor.attack.setValueAtTime(0.003, audioContext.currentTime); // Fast attack (3ms)
       compressor.release.setValueAtTime(0.25, audioContext.currentTime); // Quick release (250ms)
-      
+
       // Create post-gain (final volume)
       const postGain = audioContext.createGain();
       postGain.gain.value = 2.0; // 2x after compression
-      
+
       // Connect chain: source -> pre-gain -> compressor -> post-gain -> speakers
       source.connect(preGain);
       preGain.connect(compressor);
       compressor.connect(postGain);
       postGain.connect(audioContext.destination);
-      
+
       console.log('  ✅ Audio chain connected:');
-      console.log('    Source -> PreGain(3x) -> Compressor -> PostGain(2x) -> Speakers');
+      console.log(
+        '    Source -> PreGain(3x) -> Compressor -> PostGain(2x) -> Speakers',
+      );
       console.log('  🔊 ✅ HIGH QUALITY AUDIO ROUTING COMPLETE!');
-      
+
       // Store for cleanup
       if (participants.has(clientId)) {
         participants.get(clientId).audioContext = audioContext;
         participants.get(clientId).audioSource = source;
         participants.get(clientId).gainNode = postGain; // Store post-gain for volume control
       }
-      
+
       // Monitor audio levels in real-time to see if voice is coming through
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
-      
+
       // Connect analyser AFTER post-gain to monitor final output
       postGain.connect(analyser);
-      
+
       setInterval(() => {
         analyser.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
         const max = Math.max(...dataArray);
-        
+
         if (average > 1 || max > 1) {
-          console.log('  🔊 OUTPUT AUDIO LEVEL:', '█'.repeat(Math.floor(max / 10)), 'avg:', Math.round(average), 'max:', max);
+          console.log(
+            '  🔊 OUTPUT AUDIO LEVEL:',
+            '█'.repeat(Math.floor(max / 10)),
+            'avg:',
+            Math.round(average),
+            'max:',
+            max,
+          );
         } else {
-          console.log('  🔇 NO AUDIO DATA in output (silence or white noise only)');
+          console.log(
+            '  🔇 NO AUDIO DATA in output (silence or white noise only)',
+          );
         }
-        
-        console.log('  📊 AudioContext state:', audioContext.state, 'time:', Math.round(audioContext.currentTime));
-        console.log('  📊 Stream active:', stream.active, 'Track readyState:', stream.getTracks()[0].readyState);
+
+        console.log(
+          '  📊 AudioContext state:',
+          audioContext.state,
+          'time:',
+          Math.round(audioContext.currentTime),
+        );
+        console.log(
+          '  📊 Stream active:',
+          stream.active,
+          'Track readyState:',
+          stream.getTracks()[0].readyState,
+        );
       }, 2000);
-      
     } catch (e) {
       console.error('  ❌ Web Audio API failed:', e);
       console.error('  ❌ Stack:', e.stack);
@@ -863,27 +911,36 @@ async function consumeAudio(producerId, clientId) {
     setTimeout(() => {
       console.log('  🔊 CONSUME: Attempting to play audio...');
       const playPromise = audio.play();
-      
+
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
             console.log('  ✅ CONSUME: Audio playing successfully!');
-            console.log('  🔊 Audio element in DOM:', document.body.contains(audio));
-            console.log('  🔊 Audio paused:', audio.paused, 'Volume:', audio.volume);
+            console.log(
+              '  🔊 Audio element in DOM:',
+              document.body.contains(audio),
+            );
+            console.log(
+              '  🔊 Audio paused:',
+              audio.paused,
+              'Volume:',
+              audio.volume,
+            );
           })
           .catch((e) => {
             console.warn('  ⚠️ CONSUME: Autoplay blocked:', e.message);
             console.log('  💡 Click anywhere on the page to enable audio');
-            
+
             // Try to play on any user interaction
             const tryPlay = () => {
               console.log('  🔊 User clicked, trying to play audio...');
-              audio.play()
+              audio
+                .play()
                 .then(() => {
                   console.log('  ✅ Audio started after user interaction!');
                   document.removeEventListener('click', tryPlay);
                 })
-                .catch(err => {
+                .catch((err) => {
                   console.error('  ❌ Still failed:', err.message);
                 });
             };
@@ -1059,7 +1116,10 @@ async function consumeVideo(producerId, clientId) {
       rtpCapabilities: device.rtpCapabilities,
     };
 
-    const { id, kind, rtpParameters } = await socketRequest('consume', consumeParams);
+    const { id, kind, rtpParameters } = await socketRequest(
+      'consume',
+      consumeParams,
+    );
     console.log('  ✅ CONSUME: Got video consumer params:', { id, kind });
 
     const consumer = await recvTransport.consume({
@@ -1084,7 +1144,6 @@ async function consumeVideo(producerId, clientId) {
 
     // Update video tile
     updateParticipantVideo(clientId);
-
   } catch (error) {
     console.error('  ❌ Failed to consume video:', error);
   }
@@ -1102,7 +1161,7 @@ function updateParticipantVideo(clientId) {
     video = document.createElement('video');
     video.autoplay = true;
     video.playsInline = true;
-    video.muted = (clientId === myClientId); // Mute own video
+    video.muted = clientId === myClientId; // Mute own video
     tile.querySelector('.no-video')?.remove();
     tile.appendChild(video);
   }
@@ -1162,7 +1221,7 @@ function updateVideoGrid() {
     tile.className = 'video-tile';
     tile.id = `video-tile-${clientId}`;
 
-    const isMe = (clientId === myClientId);
+    const isMe = clientId === myClientId;
     const name = isMe ? 'You' : `User ${clientId.substring(0, 8)}`;
 
     // Default no-video view

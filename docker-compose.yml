@@ -1,0 +1,67 @@
+version: "3.9"
+
+services:
+  sfu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sample-sfu
+    restart: always
+    ports:
+      - "3000:3000"
+      - "40000-40100:40000-40100/udp"  # RTC ports (limited range for Docker)
+      - "40000-40100:40000-40100/tcp"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:3000}
+      - RTC_MIN_PORT=40000
+      - RTC_MAX_PORT=40100
+      - ANNOUNCED_IP=${ANNOUNCED_IP:-127.0.0.1}
+      - NODE_ENV=${NODE_ENV:-production}
+    volumes:
+      - ./frontend:/app/frontend  # Mount frontend for hot-reload in dev
+    networks:
+      - sfu-network
+
+  postgres:
+    image: postgres:17.4
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: hasura
+      POSTGRES_PASSWORD: hasura
+      POSTGRES_DB: hasura
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - sfu-network
+
+  hasura:
+    image: hasura/graphql-engine:v2.41.0
+    container_name: hasura
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://hasura:hasura@postgres:5432/hasura
+      HASURA_GRAPHQL_ADMIN_SECRET: "123456"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: "public"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: "startup,http-log,webhook-log,websocket-log,query-log"
+    volumes:
+      - ./hasura/metadata:/hasura-metadata
+      - ./hasura/migrations:/hasura-migrations
+    networks:
+      - sfu-network
+
+volumes:
+  postgres_data:
+
+networks:
+  sfu-network:
+    driver: bridge
